@@ -1,12 +1,23 @@
 ---
 name: vault
 description: |
-  AI-powered secret management. Automatically save and retrieve API keys, passwords, and other sensitive information.
+  Secure vault for storing passwords, API keys, tokens, and other sensitive data with AES-256 encryption.
 
-  When users say "remember", "save", or "store", AI will automatically save secrets.
-  When users say "my key", "that password", AI will automatically retrieve secrets.
+  **Use Vault for:**
+  - Passwords ("保存密码", "记住密码")
+  - API keys ("保存 API key", "OpenAI 密钥是...")
+  - Tokens ("GitHub token", "认证令牌")
+  - Any sensitive credentials that need encryption
 
-  After initialization, AI will securely manage your sensitive information in the background.
+  **Do NOT use Vault for:**
+  - General notes ("今天是4月1日") — use other note-taking methods
+  - Non-sensitive information
+  - Temporary data
+
+  **How it works:**
+  1. First time: Ask user for Vault passphrase
+  2. Use VAULT_PASSPHRASE env var for all commands
+  3. Data syncs via iCloud across all devices
 ---
 
 # Vault — AI Secret Management
