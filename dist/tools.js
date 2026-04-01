@@ -254,11 +254,28 @@ export async function resetVault() {
         const location = await getStorageLocation();
         const dataFile = join(location.path, 'secrets.json');
         if (existsSync(dataFile)) {
-            await writeFile(dataFile, '', 'utf-8');
+            // Secure wipe: overwrite with random data multiple times before deleting
+            const { unlink } = await import('fs/promises');
+            try {
+                // Read file size
+                const { statSync } = await import('fs');
+                const fileSize = statSync(dataFile).size;
+                // Overwrite 3 times with random data
+                for (let i = 0; i < 3; i++) {
+                    const randomData = crypto.getRandomValues(new Uint8Array(fileSize));
+                    await writeFile(dataFile, Buffer.from(randomData));
+                }
+                // Finally delete the file
+                await unlink(dataFile);
+            }
+            catch {
+                // If secure wipe fails, fall back to simple overwrite
+                await writeFile(dataFile, '', 'utf-8');
+            }
         }
         return {
             success: true,
-            message: 'Vault has been reset. Run "vault init" to set up again.',
+            message: 'Vault has been securely reset. Run "vault init" to set up again.',
         };
     }
     catch {

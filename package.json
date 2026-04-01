@@ -46,7 +46,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "keytar": "^7.9.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

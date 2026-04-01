@@ -97,28 +97,24 @@ Shows all saved secret names (without values).
 
 - Passphrase must be at least 8 characters
 - Secrets are encrypted using AES-256-GCM
+- Master key is derived from passphrase (same password = same key on all devices)
 - Encrypted data is stored in iCloud (if available) or locally
 - Use VAULT_PASSPHRASE env var to avoid interactive prompts in AI mode
-
-- Passphrase must be at least 8 characters
-- Secrets are encrypted using AES-256-GCM
-- Encrypted data is stored in iCloud (if available) or locally
-- Master key is stored in system keychain
+- ⚠️ Forgetting passphrase means data cannot be recovered
 
 ## Error Handling
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `Vault is not initialized` | First time use | Run `vault init <username>` |
+| `Vault is not initialized` | First time use | Run `vault init` |
 | `Passphrase incorrect` | Wrong password | Re-enter correct passphrase |
 | `Secret "xxx" not found` | Secret not found | Check name or use `vault list` |
 | `Key name cannot be empty` | Validation failed | Provide valid key name |
 
 ## Storage Locations
 
-- **iCloud**: `~/Library/Mobile Documents/com~apple~CloudDocs/.vault-data/`
+- **iCloud (macOS)**: `~/Library/Mobile Documents/com~apple~CloudDocs/.vault-data/`
 - **Local fallback**: `~/.vault-data/`
-- **Keychain**: service=`vault-skill`, account=`master-key`
 
 ## Example Conversations
 
