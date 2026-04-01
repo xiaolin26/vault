@@ -43,45 +43,56 @@ If it shows `Initialized: no`, prompt the user:
 
 ```
 Vault is not initialized. Please run:
-  vault init <username>
+  vault init
 
 Then set a passphrase (at least 8 characters).
 ```
 
 ### 1. Save a secret (set_secret)
 
-When the user wants to save a secret, use bash command:
+**IMPORTANT**: Always use `VAULT_PASSPHRASE` environment variable to avoid interactive prompts.
+
+If the Vault passphrase is not known, ask the user first:
+
+```
+I need your Vault passphrase to save this secret.
+```
+
+Then use bash command:
 
 ```bash
-echo "<secret-value>" | vault set <key-name> --description "<description>"
+VAULT_PASSPHRASE="<passphrase>" vault set <key-name> "<value>" --description "<description>"
 ```
 
 Example:
 ```bash
-echo "sk-abc123" | vault set openai_key --description "OpenAI API Key"
+VAULT_PASSPHRASE="mypassword" vault set openai_key "sk-abc123" --description "OpenAI API Key"
 ```
-
-**Important**: Never pass secret values directly in command history. Use echo pipe.
 
 ### 2. Get a secret (get_secret)
 
 When the user wants to retrieve a secret, use bash command:
 
 ```bash
-vault get <key-name>
+VAULT_PASSPHRASE="<passphrase>" vault get <key-name>
 ```
 
-This will prompt for passphrase, then output the secret value.
+This will output the secret value.
 
 ### 3. List secrets (list_secrets)
 
 ```bash
-vault list
+VAULT_PASSPHRASE="<passphrase>" vault list
 ```
 
 Shows all saved secret names (without values).
 
 ## Security Notes
+
+- Passphrase must be at least 8 characters
+- Secrets are encrypted using AES-256-GCM
+- Encrypted data is stored in iCloud (if available) or locally
+- Use VAULT_PASSPHRASE env var to avoid interactive prompts in AI mode
 
 - Passphrase must be at least 8 characters
 - Secrets are encrypted using AES-256-GCM
