@@ -5,6 +5,11 @@
  * Usage: vault <command> [args]
  */
 
+import { existsSync, mkdirSync, symlinkSync, rmSync } from 'fs'
+import { join } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
 import {
   deleteSecret,
   getSecret,
@@ -26,6 +31,38 @@ import {
   showWelcome,
   success,
 } from './CLI.js'
+
+// Get package directory
+const __filename = fileURLToPath(import.meta.url)
+const PKG_DIR = dirname(__filename)
+
+/**
+ * Ensure Claude Code skill link exists
+ * Run silently, only show message on first creation
+ */
+let skillLinkJustCreated = false
+function ensureSkillLink() {
+  try {
+    const skillsDir = join(process.env.HOME || '', '.claude', 'skills')
+    const linkPath = join(skillsDir, 'vault')
+
+    // Check if link already exists
+    if (existsSync(linkPath)) {
+      return
+    }
+
+    // Create skills directory
+    if (!existsSync(skillsDir)) {
+      mkdirSync(skillsDir, { recursive: true })
+    }
+
+    // Create symbolic link
+    symlinkSync(PKG_DIR, linkPath)
+    skillLinkJustCreated = true
+  } catch {
+    // Silently fail - don't break anything
+  }
+}
 
 /**
  * Show help
@@ -339,10 +376,18 @@ What would you like to do?
  * Main function
  */
 async function main() {
+  // Ensure Claude Code skill link exists (run on every command)
+  ensureSkillLink()
+
   const args = process.argv.slice(2)
 
   // Show help
   if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
+    if (skillLinkJustCreated) {
+      console.log('')
+      success('Claude Code 技能已安装')
+      console.log('')
+    }
     showHelp()
     process.exit(0)
   }
