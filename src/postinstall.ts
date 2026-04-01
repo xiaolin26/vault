@@ -1,11 +1,26 @@
 #!/usr/bin/env bun
 /**
  * Post-install script
- * Runs after npm install to guide user through setup
+ * Automatically creates Claude Code skill link after npm install
  */
 
-import { checkInitialized, showWelcome, info, success } from './CLI.js'
-import { getVaultStatus } from './tools.js'
+import { existsSync, mkdirSync } from 'fs'
+import { symlinkSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Colors for terminal output
+const GREEN = '\x1b[0;32m'
+const BLUE = '\x1b[0;34m'
+const YELLOW = '\x1b[1;33m'
+const NC = '\x1b[0m'
+
+function log(msg: string, color = GREEN) {
+  console.log(`${color}${msg}${NC}`)
+}
 
 async function main() {
   // Only run for global installation
@@ -14,30 +29,50 @@ async function main() {
     return
   }
 
-  // Check if already initialized
-  const status = await getVaultStatus()
+  // Get the package directory (dist folder)
+  // We're in dist/postinstall.js, so go up one level
+  const packageDir = dirname(__dirname)
 
-  showWelcome()
+  // Claude Code skills directory
+  const skillsDir = join(process.env.HOME || '', '.claude', 'skills')
+  const linkPath = join(skillsDir, 'vault')
 
-  if (status.initialized) {
-    success('Vault 已就绪！')
-    console.log('')
-    info('在 Claude Code 中说「记住我的密钥是 xxx」来保存密钥')
-    return
+  try {
+    // Create skills directory if it doesn't exist
+    if (!existsSync(skillsDir)) {
+      mkdirSync(skillsDir, { recursive: true })
+    }
+
+    // Check if link already exists
+    if (existsSync(linkPath)) {
+      // Remove old link
+      const { rmSync } = await import('fs')
+      try {
+        rmSync(linkPath, { recursive: true, force: true })
+      } catch {
+        // Ignore error
+      }
+    }
+
+    // Create symbolic link
+    symlinkSync(packageDir, linkPath)
+
+    log('')
+    log('🔐 Vault - AI Secret Management', BLUE)
+    log('━'.repeat(40))
+    log('')
+    log('✓ Claude Code 技能已安装', GREEN)
+    log('')
+    log('下一步：')
+    log('  1. 初始化: ' + YELLOW + 'vault init' + NC)
+    log('  2. 然后在 Claude Code 中说：')
+    log('     「记住我的密钥是 xxx」')
+    log('')
+
+  } catch (error) {
+    // Silently fail - don't break installation
+    // User can manually create link if needed
   }
-
-  // Not initialized
-  console.log('')
-  console.log('🚀 下一步：')
-  console.log('')
-  console.log('  1. 初始化 Vault:')
-  console.log('     ${YELLOW}vault init${NC}')
-  console.log('')
-  console.log('  2. 然后在 Claude Code 中使用:')
-  console.log('     「记住我的 OpenAI 密钥是 sk-xxx」')
-  console.log('')
 }
 
-main().catch(() => {
-  // Silently fail - don't break installation
-})
+main().catch(() => {})
