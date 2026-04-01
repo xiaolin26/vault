@@ -1,0 +1,28 @@
+# 源代码（发布编译后的 dist）
+src/
+*.ts
+tsconfig.json
+
+# 开发文件
+node_modules/
+package-lock.json
+*.log
+.DS_Store
+
+# 测试
+test/
+*.test.ts
+*.spec.ts
+
+# 安装脚本（npm 用户不需要）
+install.sh
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo

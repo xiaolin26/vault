@@ -1,0 +1,62 @@
+{
+  "name": "@xiaolin26/vault",
+  "version": "1.0.0",
+  "description": "Vault - AI-powered secret management for Claude Code",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "vault": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "SKILL.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "bun test",
+    "prepublishOnly": "npm run build",
+    "prepublish": "npm run build",
+    "release": "npm version patch && npm publish --access public",
+    "release:minor": "npm version minor && npm publish --access public",
+    "release:major": "npm version major && npm publish --access public"
+  },
+  "keywords": [
+    "claude-code",
+    "skill",
+    "vault",
+    "secret",
+    "keychain",
+    "password-manager",
+    "encryption"
+  ],
+  "author": "xiaolin26 <xiaolin@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaolin26/vault.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xiaolin26/vault/issues"
+  },
+  "homepage": "https://github.com/xiaolin26/vault#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.11.0",
+    "@types/yargs": "^17.0.32",
+    "typescript": "^5.3.3"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ]
+}
