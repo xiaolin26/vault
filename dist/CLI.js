@@ -28,18 +28,26 @@ export function question(prompt) {
 }
 /**
  * Ask for password with hidden input
+ * Falls back to visible input if setRawMode is not available
  */
 export async function password(prompt = 'Passphrase: ') {
-    const rl = createRL();
-    // Hide output
     const stdin = process.stdin;
+    // Check if setRawMode is available (TTY)
+    const isTTY = stdin.isTTY && typeof stdin.setRawMode === 'function';
+    if (!isTTY) {
+        // Non-interactive mode: use normal question (password will be visible)
+        return question(prompt);
+    }
+    // Interactive mode: hide password input
+    const rl = createRL();
     const stdout = process.stdout;
+    // Mute output
     stdin.setRawMode(true);
     stdin.resume();
     stdin.setEncoding('utf8');
     stdout.write(prompt);
     return new Promise((resolve) => {
-        let password = '';
+        let pwd = '';
         const onData = (char) => {
             const charCode = char.charCodeAt(0);
             // Enter = 13, Ctrl+D = 4
@@ -49,13 +57,13 @@ export async function password(prompt = 'Passphrase: ') {
                 stdin.setRawMode(false);
                 stdout.write('\n');
                 rl.close();
-                resolve(password);
+                resolve(pwd);
                 return;
             }
             // Backspace = 127, Ctrl+H = 8
             if (charCode === 127 || charCode === 8) {
-                if (password.length > 0) {
-                    password = password.slice(0, -1);
+                if (pwd.length > 0) {
+                    pwd = pwd.slice(0, -1);
                 }
                 return;
             }
@@ -70,7 +78,7 @@ export async function password(prompt = 'Passphrase: ') {
                 return;
             }
             // Regular character
-            password += char;
+            pwd += char;
         };
         stdin.on('data', onData);
     });
