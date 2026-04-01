@@ -1,6 +1,6 @@
 {
   "name": "@principle2026/vault",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Vault - AI-powered secret management for Claude Code",
   "type": "module",
   "main": "dist/index.js",
