@@ -217,7 +217,7 @@ async function handleInit(username?: string) {
  * Handle get command
  */
 async function handleGet(key: string) {
-  const passphrase = await password('Passphrase: ')
+  const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ')
   const value = await getSecret(key, passphrase)
   console.log(value)
 }
@@ -266,7 +266,7 @@ async function handleSet(args: string[]) {
     value = await question('Secret value: ')
   }
 
-  const passphrase = await password('Passphrase: ')
+  const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ')
   const result = await setSecret(key, value, passphrase, description)
 
   if (result.success) {
@@ -282,7 +282,7 @@ async function handleSet(args: string[]) {
  * Handle list command
  */
 async function handleList() {
-  const passphrase = await password('Passphrase: ')
+  const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ')
   const secrets = await listSecrets(passphrase)
 
   if (secrets.length === 0) {
@@ -311,7 +311,7 @@ async function handleDelete(key: string) {
     process.exit(0)
   }
 
-  const passphrase = await password('Passphrase: ')
+  const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ')
   const result = await deleteSecret(key, passphrase)
 
   if (result.success) {

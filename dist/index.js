@@ -170,7 +170,7 @@ async function handleInit(username) {
  * Handle get command
  */
 async function handleGet(key) {
-    const passphrase = await password('Passphrase: ');
+    const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ');
     const value = await getSecret(key, passphrase);
     console.log(value);
 }
@@ -214,7 +214,7 @@ async function handleSet(args) {
         // No value provided, prompt for it
         value = await question('Secret value: ');
     }
-    const passphrase = await password('Passphrase: ');
+    const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ');
     const result = await setSecret(key, value, passphrase, description);
     if (result.success) {
         success(result.message);
@@ -228,7 +228,7 @@ async function handleSet(args) {
  * Handle list command
  */
 async function handleList() {
-    const passphrase = await password('Passphrase: ');
+    const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ');
     const secrets = await listSecrets(passphrase);
     if (secrets.length === 0) {
         info('No secrets saved yet');
@@ -254,7 +254,7 @@ async function handleDelete(key) {
         info('Cancelled.');
         process.exit(0);
     }
-    const passphrase = await password('Passphrase: ');
+    const passphrase = process.env.VAULT_PASSPHRASE || await password('Passphrase: ');
     const result = await deleteSecret(key, passphrase);
     if (result.success) {
         success(result.message);
