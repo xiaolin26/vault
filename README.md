@@ -15,8 +15,8 @@ A Claude Code plugin that enables AI to automatically manage your secrets and se
 ### 方式 1: npm 全局安装（推荐）
 
 ```bash
-npm install -g @xiaolin26/vault
-vault init <username>
+npm install -g @principle2026/vault
+vault init
 ```
 
 ### 方式 2: 本地开发
@@ -33,10 +33,10 @@ npm run build
 ### Initialize
 
 ```bash
-vault init <username>
+vault init
 ```
 
-Set a passphrase (at least 8 characters).
+Follow the interactive prompts to set up your master passphrase.
 
 ### Save a secret
 

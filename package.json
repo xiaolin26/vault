@@ -1,5 +1,5 @@
 {
-  "name": "xiaolin26-vault",
+  "name": "@principle2026/vault",
   "version": "1.0.0",
   "description": "Vault - AI-powered secret management for Claude Code",
   "type": "module",

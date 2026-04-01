@@ -93,7 +93,7 @@ export interface VaultConfig {
 export async function initVault(
   userId: string,
   passphrase: string,
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; storagePath?: string }> {
   try {
     validatePassphrase(passphrase)
 
@@ -117,12 +117,15 @@ export async function initVault(
     await saveMasterKey(encryptedKey)
     await saveSalt(salt)
 
-    // Initialize storage
+    // Initialize storage and get path
+    const { getStorageLocation } = await import('./Store.js')
+    const location = await getStorageLocation()
     await initStore(userId)
 
     return {
       success: true,
       message: `Vault initialized successfully! User: ${userId}`,
+      storagePath: location.path,
     }
   } catch (error) {
     return {

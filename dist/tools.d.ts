@@ -19,6 +19,7 @@ export interface VaultConfig {
 export declare function initVault(userId: string, passphrase: string): Promise<{
     success: boolean;
     message: string;
+    storagePath?: string;
 }>;
 /**
  * Get secret
