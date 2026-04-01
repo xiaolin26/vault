@@ -1,4 +1,236 @@
-# 🔐 Vault — AI 时代的密码管理，专为 Claude Code 而生
+# 🔐 Vault
+
+**[English](#english) | [中文](#中文)**
+
+---
+
+<a id="english"></a>
+
+# Vault — AI-Native Secret Management for Claude Code
+
+> **Coding with AI but still copy-pasting API keys by hand?**
+>
+> Vault lets you manage all your secrets with natural language. Just say "remember my OpenAI key" — that's it.
+
+---
+
+## The Problem
+
+If you use Claude Code, you've hit these walls:
+
+- 🔑 Need an API key mid-deploy — scramble through notes to find it
+- 🤦 Accidentally commit a secret to git — panic mode
+- 💻 Switch to a new Mac — reconfigure every single key from scratch
+- 📋 `.env` files scattered across dozens of projects — unmanageable
+
+**Vault turns AI into your secret keeper — encrypted, synced, zero friction.**
+
+---
+
+## Why Vault
+
+| | Vault | .env files | 1Password CLI | System Keychain |
+|---|---|---|---|---|
+| AI-native conversational UI | ✅ | ❌ | ❌ | ❌ |
+| End-to-end encryption (AES-256-GCM) | ✅ | ❌ | ✅ | ✅ |
+| iCloud auto-sync | ✅ | ❌ | Paid | ❌ |
+| Deep Claude Code integration | ✅ | ❌ | ❌ | ❌ |
+| Fully open-source | ✅ | — | ❌ | ❌ |
+| Zero-config setup | ✅ | ✅ | ❌ | ❌ |
+
+---
+
+## Get Started in 30 Seconds
+
+```bash
+npm install -g @principle2026/vault
+vault init
+```
+
+The installer handles everything: CLI setup → Claude Code skill linking → first-time passphrase.
+
+**Then just talk to Claude Code:**
+
+```
+You: Remember my OpenAI key is sk-abc123
+AI:  ✅ Securely saved: openai_key
+
+You: Create a GitHub repo using my saved token
+AI:  Reading your saved token... → Repo created ✅
+
+You: What secrets do I have?
+AI:  📋 openai_key · github_token · aws_secret
+```
+
+**No config files. No CLI flags. Just plain English.**
+
+---
+
+## Key Features
+
+### 🗣️ Conversational — Talk, Don't Type Commands
+
+No commands to memorize. AI automatically detects sensitive info and routes it through Vault:
+
+- `"My password is 123456"` → auto-saved
+- `"Remember my sk-xxx"` → recognized as API key, saved
+- `"Deploy with my AWS credentials"` → auto-retrieved and used
+
+### 🔐 Military-Grade Encryption — Your Keys, Only Yours
+
+- **AES-256-GCM** encryption (the same standard used for classified government communications)
+- **PBKDF2** key derivation with 100,000 iterations — brute force is not an option
+- Passphrase never touches disk, never uploaded, never shared. **Forget it = data gone forever** (that's a feature, not a bug)
+
+### ☁️ iCloud Sync — Switch Devices Seamlessly
+
+Encrypted data syncs automatically via iCloud. On a new device:
+
+```bash
+npm install -g @principle2026/vault
+vault init    # Same passphrase → all secrets instantly available
+```
+
+| What | Where | Sync |
+|---|---|---|
+| Encrypted secret data | iCloud `~/.vault-data/` | ✅ Automatic |
+| CLI + skill link | Local `~/.claude/skills/vault` | Install per device |
+
+### 🔓 Fully Open-Source — Trust Code, Not Promises
+
+Every line of encryption logic is auditable. Don't take our word for it: [view the source →](https://github.com/xiaolin26/vault/tree/main/src)
+
+---
+
+## How AI Decides When to Use Vault
+
+Vault runs as a Claude Code Skill. AI automatically determines when to invoke it based on context:
+
+| What you say | What AI does |
+|---|---|
+| "My password is...", "key is...", "token is..." | 🔒 Encrypt & save via Vault |
+| "Use my xxx key", "the token I saved earlier" | 🔓 Retrieve from Vault & use |
+| "What secrets do I have?", "List my keys" | 📋 List all saved entries |
+| "Delete xxx" | 🗑️ Remove from Vault |
+
+**⚠️ Critical design: When AI detects passwords / API keys / sensitive data, it automatically routes through Vault — never saved to CLAUDE.md or any plaintext file.**
+
+---
+
+## CLI Reference
+
+Beyond conversational use, you can also operate directly from the terminal:
+
+```bash
+vault status               # Check Vault status
+vault set <key>            # Interactively save a secret
+vault get <key>            # Retrieve a secret
+vault list                 # List all secrets
+vault delete <key>         # Delete a secret
+vault reset                # Reset (delete all data)
+```
+
+For scripts / CI:
+
+```bash
+VAULT_PASSPHRASE="yourpassword" vault set mykey "myvalue"
+VAULT_PASSPHRASE="yourpassword" vault get mykey
+```
+
+---
+
+## Security Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Your Passphrase                    │
+│           (exists only in your head)            │
+└────────────────────┬────────────────────────────┘
+                     │ PBKDF2 (100K iterations)
+                     ▼
+              ┌─────────────┐
+              │  Master Key  │  ← Same passphrase = same key
+              └──────┬──────┘     (multi-device support)
+                     │ AES-256-GCM
+                     ▼
+         ┌───────────────────────┐
+         │   Encrypted Secrets   │
+         │   ~/.vault-data/      │
+         └───────────┬───────────┘
+                     │ iCloud Sync
+                     ▼
+            ┌─────────────────┐
+            │  All Your Macs  │
+            │  Instant Access  │
+            └─────────────────┘
+```
+
+**Design principles:**
+- Passphrase is never stored or transmitted — key is derived in real-time from your input
+- Even if iCloud is compromised, data is unreadable without the passphrase
+- Even if code is tampered with, the encryption algorithm itself guarantees security (AES-256-GCM is industry standard)
+
+---
+
+## Manual Installation (Optional)
+
+For more granular control over the installation process:
+
+```bash
+# 1. Install the npm package
+npm install -g @principle2026/vault
+
+# 2. Create Claude Code skill link
+ln -s $(npm root -g)/@principle2026/vault ~/.claude/skills/vault
+
+# 3. Initialize
+vault init
+```
+
+---
+
+## FAQ
+
+**Q: What if I forget my passphrase?**
+A: Unrecoverable. By design — no backdoor means nobody can bypass encryption, including the developer.
+
+**Q: Does it work on Windows / Linux?**
+A: CLI and encryption work on all platforms. iCloud sync is macOS only; other platforms store data locally at `~/.vault-data/`.
+
+**Q: How is this different from `.env` files?**
+A: `.env` files are plaintext and easily committed to git by mistake. Vault encrypts everything, and AI manages it automatically — no files to maintain.
+
+**Q: Is the passphrase safe? Can AI see it?**
+A: The passphrase is passed to the CLI via environment variable. It's never written to any file or log. AI uses it transiently and does not persist it in conversation history.
+
+---
+
+## Links
+
+- 📦 npm: [@principle2026/vault](https://www.npmjs.com/package/@principle2026/vault)
+- 💻 GitHub: [xiaolin26/vault](https://github.com/xiaolin26/vault)
+
+---
+
+## License
+
+MIT — Use freely, modify freely, distribute freely.
+
+---
+
+<p align="center">
+  <b>In the age of AI-powered coding, secret management should be AI-powered too.</b><br>
+  <sub>Built with ❤️ for the Claude Code community</sub>
+</p>
+
+---
+---
+
+<a id="中文"></a>
+
+# Vault — AI 时代的密码管理，专为 Claude Code 而生
+
+**[English](#english) | [中文](#中文)**
 
 > **用 AI 编程，却还在手动复制粘贴 API Key？**
 >
