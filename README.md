@@ -1,117 +1,138 @@
-# Vault — AI-Powered Secret Management
+# Vault — AI-Powered Secret Management for Claude Code
 
-A Claude Code plugin that enables AI to automatically manage your secrets and sensitive information.
+一个 Claude Code 技能，让 AI 帮你安全地管理 API 密钥、密码等敏感信息。
 
-## Features
+## 特点
 
-- 🗣️ **Conversational** — Save and retrieve secrets using natural language
-- 🔐 **End-to-end encryption** — AES-256-GCM encryption
-- ☁️ **iCloud sync** — Automatically sync across all your devices
-- 🔑 **Keychain integration** — Secure master key storage
-- ⚡ **Zero config** — Ready to use after initialization
+- 🗣️ **对话式操作** — 用自然语言保存和获取密钥
+- 🔐 **端到端加密** — AES-256-GCM 加密
+- ☁️ **iCloud 同步** — 自动同步到所有设备（macOS）
+- 🔑 **Keychain 集成** - 安全存储主密钥
+- ⚡ **零配置** — 安装后立即可用
 
-## Installation
+---
 
-### 方式 1: npm 全局安装（推荐）
+## 安装
+
+### 一键安装（推荐）
 
 ```bash
 npm install -g @principle2026/vault
 vault init
 ```
 
-### 方式 2: 本地开发
+安装脚本会自动：
+- 安装 CLI 命令
+- 创建 Claude Code 技能链接
+- 引导你完成首次设置
+
+### 手动安装 Claude Code 技能
 
 ```bash
-git clone <repository>
-cd Vault
-npm install
-npm run build
-```
+# 1. 安装 npm 包
+npm install -g @principle2026/vault
 
-## Usage
+# 2. 找到安装位置
+npm root -g
+# 输出: /usr/local/lib/node_modules （或其他路径）
 
-### Initialize
+# 3. 创建技能链接
+ln -s $(npm root -g)/@principle2026/vault ~/.claude/skills/vault
 
-```bash
+# 4. 初始化
 vault init
 ```
 
-Follow the interactive prompts to set up your master passphrase.
+---
 
-### Save a secret
+## 在 Claude Code 中使用
 
-```bash
-echo "sk-abc123" | vault set openai_key --description "OpenAI API Key"
+安装后，直接和 AI 对话：
+
+### 保存密钥
+
+```
+你：记住我的 OpenAI 密钥是 sk-abc123
+AI：✅ 已保存：openai_key
 ```
 
-### Get a secret
-
-```bash
-vault get openai_key
+```
+你：保存这个 GitHub token: ghp_xxx123
+AI：[运行: vault set github_token --description "GitHub Token"]
+    ✅ Saved: github_token
 ```
 
-### List secrets
+### 获取密钥
 
-```bash
-vault list
+```
+你：用刚才保存的 token 创建一个 GitHub repo
+AI：好的，使用你保存的 GitHub token...
+    [运行: vault get github_token]
+    → 正在创建仓库...
 ```
 
-### Delete a secret
-
-```bash
-vault delete openai_key
+```
+你：我的 OpenAI 密钥是什么？
+AI：[运行: vault get openai_key]
+    sk-abc123
 ```
 
-### Check status
+### 查看所有密钥
+
+```
+你：我保存了哪些密钥？
+AI：[运行: vault list]
+    📋 已保存的密钥：
+    - openai_key - OpenAI API Key
+    - github_token - GitHub Token
+```
+
+### AI 自动识别的关键词
+
+| 你说 | AI 做 |
+|------|------|
+| "记住/保存/存储..." | 保存密钥 |
+| "那个密钥/我的密码/刚才的..." | 获取密钥 |
+| "有哪些/列出/查看..." | 显示密钥列表 |
+| "删除..." | 删除密钥 |
+
+---
+
+## CLI 命令（手动使用）
 
 ```bash
+# 查看状态
 vault status
+
+# 保存密钥
+vault set <key>
+# 或：echo "value" | vault set <key> -d "描述"
+
+# 获取密钥
+vault get <key>
+
+# 列出所有密钥
+vault list
+
+# 删除密钥
+vault delete <key>
+
+# 重置（删除所有数据）
+vault reset
 ```
 
-## AI Conversation Usage
+---
 
-In Claude Code, use natural language:
+## 安全设计
 
-```
-You: Remember my OpenAI key is sk-abc123
-AI: [auto-save] Saved: openai_key
+- **加密算法**: AES-256-GCM
+- **密钥派生**: PBKDF2 (100,000 次迭代)
+- **存储位置**: iCloud（macOS）或本地 `~/.vault-data/`
+- **主密钥**: 系统 Keychain（受密码保护）
 
-You: Use that key to call the API
-AI: [auto-retrieve] Using sk-abc123...
-```
+---
 
-## Security Design
+## 项目地址
 
-- **Algorithm**: AES-256-GCM
-- **Key derivation**: PBKDF2 (100,000 iterations)
-- **Storage**: iCloud or local `~/.vault-data/`
-- **Master key**: System keychain (unlocked by passphrase)
-
-## Project Structure
-
-```
-src/
-├── Crypto.ts   # Encryption/decryption
-├── Keychain.ts # Keychain operations
-├── Store.ts    # Data storage
-├── tools.ts    # Core functions
-└── index.ts    # CLI entry point
-```
-
-## Development
-
-```bash
-# Build
-npm run build
-
-# Watch mode
-npm run dev
-
-# Run CLI
-./dist/index.js status
-```
-
-## Dependencies
-
-- `keytar` — Keychain access
-- Web Crypto API — Encryption operations
+- npm: https://www.npmjs.com/package/@principle2026/vault
+- GitHub: https://github.com/xiaolin26/vault
