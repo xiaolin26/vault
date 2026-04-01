@@ -99,12 +99,12 @@ Examples:
  * Handle init command
  */
 async function handleInit(username?: string) {
-  // Check if already initialized
-  const isInitialized = await checkInitialized()
+  const status = await getVaultStatus()
 
-  if (isInitialized) {
+  // Case 1: Already initialized on this device
+  if (status.initialized && !status.isNewVersion) {
     const reset = await confirm(
-      'Vault is already initialized. Do you want to reset and start over?'
+      'Vault is already initialized (old version). Do you want to reset and start over?'
     )
 
     if (!reset) {
@@ -120,8 +120,55 @@ async function handleInit(username?: string) {
 
     await resetVault()
     info('Vault has been reset.')
+    // Fall through to create new vault
   }
 
+  // Case 2: Found existing Vault data (from iCloud)
+  if (status.initialized && status.isNewVersion) {
+    console.log('')
+    console.log('🔐 Found existing Vault data (synced via iCloud)')
+    console.log('')
+    console.log('Choose an option:')
+    console.log('  1. Join existing Vault (use same password)')
+    console.log('  2. Create new Vault (will overwrite synced data)')
+    console.log('')
+
+    const choice = await question('Choose [1/2]: ')
+
+    if (choice.trim() === '1') {
+      // Join existing vault
+      console.log('')
+      const passphrase = await password('Enter your Vault password: ')
+
+      // Verify password works
+      try {
+        const secrets = await listSecrets(passphrase)
+        success(`Unlocked! Found ${secrets.length} secret(s)`)
+        console.log('')
+        info('You can now use Vault on this device.')
+        process.exit(0)
+      } catch {
+        error('Incorrect password or corrupted data.')
+        process.exit(1)
+      }
+    } else if (choice.trim() !== '2') {
+      info('Cancelled.')
+      process.exit(0)
+    }
+
+    // User chose to create new vault - warn them
+    const sure = await confirm(
+      'This will overwrite your synced Vault data. Are you sure?'
+    )
+    if (!sure) {
+      info('Cancelled.')
+      process.exit(0)
+    }
+
+    await resetVault()
+  }
+
+  // Case 3: Create new Vault
   let setupUsername: string
   let setupPassphrase: string
 
@@ -155,8 +202,10 @@ async function handleInit(username?: string) {
 
   if (result.success) {
     success('Vault initialized successfully!')
-    info(`Your secrets are stored in: ${result.storagePath}`)
+    info(`Your secrets will sync via iCloud to: ${result.storagePath}`)
     info('Use "vault set <key>" to add your first secret.')
+    info('')
+    info('💡 On other devices: run "vault init" and choose "Join existing Vault"')
   } else {
     error(result.message)
   }

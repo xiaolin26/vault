@@ -2,6 +2,11 @@
  * Tools - Secret operations
  *
  * Core functions for AI to call
+ *
+ * NEW ARCHITECTURE for multi-device sync:
+ * - Master key is derived from passphrase + vault salt (stored in data file)
+ * - Same passphrase = same master key on all devices
+ * - No keychain dependency for the master key
  */
 export declare class VaultNotInitializedError extends Error {
     constructor();
@@ -54,6 +59,7 @@ export declare function getVaultStatus(): Promise<{
     storageType: 'icloud' | 'local' | 'unknown';
     userId?: string;
     secretCount: number;
+    isNewVersion: boolean;
 }>;
 /**
  * Reset Vault

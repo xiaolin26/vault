@@ -2,6 +2,11 @@
  * Tools - Secret operations
  *
  * Core functions for AI to call
+ *
+ * NEW ARCHITECTURE for multi-device sync:
+ * - Master key is derived from passphrase + vault salt (stored in data file)
+ * - Same passphrase = same master key on all devices
+ * - No keychain dependency for the master key
  */
 
 import type {
@@ -10,23 +15,26 @@ import type {
 } from './Crypto.js'
 import {
   decrypt,
+  deriveKey,
   encrypt,
   generateSalt,
   validatePassphrase,
 } from './Crypto.js'
 import {
-  deleteMasterKey,
-  getMasterKey,
-  getSalt,
-  saveMasterKey,
-  saveSalt,
-} from './Keychain.js'
-import {
-  initStore,
   readStore,
   writeStore,
   type StoredData,
 } from './Store.js'
+import { join } from 'path'
+import { homedir } from 'os'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+// Vault salt is stored in the data file and shared across devices
+// This allows same passphrase to derive same master key on all devices
+const VAULT_SALT_KEY = '_vault_salt'
 
 // ============================================================================
 // Error types
@@ -34,9 +42,7 @@ import {
 
 export class VaultNotInitializedError extends Error {
   constructor() {
-    super(
-      'Vault is not initialized. Please run: vault init <username>',
-    )
+    super('Vault is not initialized. Please run: vault init')
     this.name = 'VaultNotInitializedError'
   }
 }
@@ -49,33 +55,31 @@ export class SecretNotFoundError extends Error {
 }
 
 // ============================================================================
-// Utility functions
+// Vault Salt Management
 // ============================================================================
 
 /**
- * Decrypt master key
+ * Get or create vault salt (stored in data file, shared across devices)
  */
-async function decryptMasterKey(
-  encryptedKey: string,
-  passphrase: string,
-): Promise<string> {
-  try {
-    const parsed = JSON.parse(encryptedKey)
-    return await decrypt(parsed.encrypted, parsed.salt, passphrase)
-  } catch {
-    throw new Error('Incorrect passphrase or corrupted master key')
+async function getOrCreateVaultSalt(): Promise<string> {
+  const store = await readStore()
+
+  if (store && store.secrets[VAULT_SALT_KEY]) {
+    // Existing vault has salt
+    const parsed = JSON.parse(store.secrets[VAULT_SALT_KEY].value)
+    return parsed.salt
   }
+
+  // Create new vault salt
+  return generateSalt()
 }
 
 /**
- * Encrypt master key
+ * Derive master key from passphrase and vault salt
  */
-async function encryptMasterKey(
-  masterKey: string,
-  passphrase: string,
-): Promise<string> {
-  const result = await encrypt(masterKey, passphrase)
-  return JSON.stringify(result)
+async function deriveMasterKey(passphrase: string, salt: string): Promise<CryptoKey> {
+  const saltBuffer = Buffer.from(salt, 'hex')
+  return deriveKey(passphrase, saltBuffer)
 }
 
 // ============================================================================
@@ -98,29 +102,38 @@ export async function initVault(
     validatePassphrase(passphrase)
 
     // Check if already exists
-    const existingKey = await getMasterKey()
-    if (existingKey) {
+    const store = await readStore()
+    if (store && store.secrets[VAULT_SALT_KEY]) {
       return {
         success: false,
         message: 'Vault already exists. To reinitialize, run: vault reset',
       }
     }
 
-    // Generate master key and salt
-    const masterKey = generateSalt()
-    const salt = generateSalt()
+    // Generate vault salt (shared across devices)
+    const vaultSalt = generateSalt()
 
-    // Encrypt master key
-    const encryptedKey = await encryptMasterKey(masterKey, passphrase)
-
-    // Save to keychain
-    await saveMasterKey(encryptedKey)
-    await saveSalt(salt)
-
-    // Initialize storage and get path
+    // Get storage location
     const { getStorageLocation } = await import('./Store.js')
     const location = await getStorageLocation()
-    await initStore(userId)
+
+    // Initialize storage with vault salt
+    const newData: StoredData = {
+      version: '2.0', // New version with synced master key
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      secrets: {
+        [VAULT_SALT_KEY]: {
+          value: JSON.stringify({ salt: vaultSalt }),
+          description: 'Vault salt (do not delete)',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      },
+    }
+
+    await writeStore(newData)
 
     return {
       success: true,
@@ -142,20 +155,15 @@ export async function getSecret(
   key: string,
   passphrase: string,
 ): Promise<string> {
-  // Get encrypted master key
-  const encryptedKey = await getMasterKey()
-  if (!encryptedKey) {
-    throw new VaultNotInitializedError()
-  }
-
-  // Decrypt master key
-  const masterKey = await decryptMasterKey(encryptedKey, passphrase)
-
   // Read store
   const store = await readStore()
-  if (!store) {
+  if (!store || !store.secrets[VAULT_SALT_KEY]) {
     throw new VaultNotInitializedError()
   }
+
+  // Get vault salt
+  const vaultSaltData = store.secrets[VAULT_SALT_KEY]
+  const vaultSalt = JSON.parse(vaultSaltData.value).salt
 
   // Get secret
   const entry = store.secrets[key]
@@ -163,9 +171,9 @@ export async function getSecret(
     throw new SecretNotFoundError(key)
   }
 
-  // Decrypt secret value
+  // Decrypt secret value (each secret has its own salt)
   const parsed = JSON.parse(entry.value)
-  return await decrypt(parsed.encrypted, parsed.salt, masterKey)
+  return await decrypt(parsed.encrypted, parsed.salt, passphrase)
 }
 
 /**
@@ -186,23 +194,21 @@ export async function setSecret(
       return { success: false, message: 'Secret value cannot be empty' }
     }
 
-    // Get encrypted master key
-    const encryptedKey = await getMasterKey()
-    if (!encryptedKey) {
-      throw new VaultNotInitializedError()
-    }
-
-    // Decrypt master key
-    const masterKey = await decryptMasterKey(encryptedKey, passphrase)
-
-    // Encrypt secret value
-    const encrypted = await encrypt(value, masterKey)
-
     // Read store
     let store = await readStore()
-    if (!store) {
+    if (!store || !store.secrets[VAULT_SALT_KEY]) {
       throw new VaultNotInitializedError()
     }
+
+    // Get vault salt
+    const vaultSaltData = store.secrets[VAULT_SALT_KEY]
+    const vaultSalt = JSON.parse(vaultSaltData.value).salt
+
+    // Derive master key
+    const masterKey = await deriveMasterKey(passphrase, vaultSalt)
+
+    // Encrypt secret value with the passphrase (encrypt function derives key internally)
+    const encrypted = await encrypt(value, passphrase)
 
     // Update secret
     const now = new Date().toISOString()
@@ -239,26 +245,24 @@ export async function setSecret(
 export async function listSecrets(
   passphrase: string,
 ): Promise<Array<{ key: string; description: string }>> {
-  // Get encrypted master key
-  const encryptedKey = await getMasterKey()
-  if (!encryptedKey) {
-    throw new VaultNotInitializedError()
-  }
-
-  // Decrypt master key
-  await decryptMasterKey(encryptedKey, passphrase)
-
   // Read store
   const store = await readStore()
-  if (!store) {
+  if (!store || !store.secrets[VAULT_SALT_KEY]) {
     throw new VaultNotInitializedError()
   }
 
-  // Return list of secret names (without values)
-  return Object.entries(store.secrets).map(([key, entry]) => ({
-    key,
-    description: entry.description || '',
-  }))
+  // Verify passphrase by deriving master key
+  const vaultSaltData = store.secrets[VAULT_SALT_KEY]
+  const vaultSalt = JSON.parse(vaultSaltData.value).salt
+  await deriveMasterKey(passphrase, vaultSalt)
+
+  // Return list of secret names (without vault salt, without values)
+  return Object.entries(store.secrets)
+    .filter(([key]) => key !== VAULT_SALT_KEY)
+    .map(([key, entry]) => ({
+      key,
+      description: entry.description || '',
+    }))
 }
 
 /**
@@ -270,17 +274,14 @@ export async function deleteSecret(
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Verify passphrase
-    const encryptedKey = await getMasterKey()
-    if (!encryptedKey) {
-      throw new VaultNotInitializedError()
-    }
-    await decryptMasterKey(encryptedKey, passphrase)
-
-    // Read store
     const store = await readStore()
-    if (!store) {
+    if (!store || !store.secrets[VAULT_SALT_KEY]) {
       throw new VaultNotInitializedError()
     }
+
+    const vaultSaltData = store.secrets[VAULT_SALT_KEY]
+    const vaultSalt = JSON.parse(vaultSaltData.value).salt
+    await deriveMasterKey(passphrase, vaultSalt)
 
     // Check if secret exists
     if (!store.secrets[key]) {
@@ -311,18 +312,21 @@ export async function getVaultStatus(): Promise<{
   storageType: 'icloud' | 'local' | 'unknown'
   userId?: string
   secretCount: number
+  isNewVersion: boolean
 }> {
-  const encryptedKey = await getMasterKey()
   const store = await readStore()
 
   const { getStorageInfo } = await import('./Store.js')
   const storageInfo = await getStorageInfo()
 
+  const hasVaultSalt = store !== null && VAULT_SALT_KEY in store.secrets
+
   return {
-    initialized: !!encryptedKey && !!store,
+    initialized: store !== null,
     storageType: storageInfo.type,
     userId: store?.user_id,
-    secretCount: store ? Object.keys(store.secrets).length : 0,
+    secretCount: store ? Object.keys(store.secrets).length - (hasVaultSalt ? 1 : 0) : 0,
+    isNewVersion: hasVaultSalt,
   }
 }
 
@@ -334,10 +338,21 @@ export async function resetVault(): Promise<{
   message: string
 }> {
   try {
-    await deleteMasterKey()
+    const { readFile, writeFile } = await import('fs/promises')
+    const { existsSync } = await import('fs')
+    const { join } = await import('path')
+    const { getStorageLocation } = await import('./Store.js')
+
+    const location = await getStorageLocation()
+    const dataFile = join(location.path, 'secrets.json')
+
+    if (existsSync(dataFile)) {
+      await writeFile(dataFile, '', 'utf-8')
+    }
+
     return {
       success: true,
-      message: 'Vault has been reset. All keys deleted, but encrypted data files still exist in storage.',
+      message: 'Vault has been reset. Run "vault init" to set up again.',
     }
   } catch {
     return {
