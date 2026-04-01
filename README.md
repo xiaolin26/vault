@@ -47,18 +47,20 @@ vault init
 
 ## 在 Claude Code 中使用
 
-安装后，直接和 AI 对话：
+安装后，直接和 AI 对话。**首次使用时，AI 会询问你的 Vault 密码**，之后会自动使用。
 
 ### 保存密钥
 
 ```
 你：记住我的 OpenAI 密钥是 sk-abc123
+AI：你的 Vault 密码是什么？（我需要它来解锁 Vault）
+你：mypassword
 AI：✅ 已保存：openai_key
 ```
 
 ```
 你：保存这个 GitHub token: ghp_xxx123
-AI：[运行: vault set github_token --description "GitHub Token"]
+AI：[运行: VAULT_PASSPHRASE="mypassword" vault set github_token "ghp_xxx123" --description "GitHub Token"]
     ✅ Saved: github_token
 ```
 
@@ -67,13 +69,13 @@ AI：[运行: vault set github_token --description "GitHub Token"]
 ```
 你：用刚才保存的 token 创建一个 GitHub repo
 AI：好的，使用你保存的 GitHub token...
-    [运行: vault get github_token]
+    [运行: VAULT_PASSPHRASE="mypassword" vault get github_token]
     → 正在创建仓库...
 ```
 
 ```
 你：我的 OpenAI 密钥是什么？
-AI：[运行: vault get openai_key]
+AI：[运行: VAULT_PASSPHRASE="mypassword" vault get openai_key]
     sk-abc123
 ```
 
@@ -81,7 +83,7 @@ AI：[运行: vault get openai_key]
 
 ```
 你：我保存了哪些密钥？
-AI：[运行: vault list]
+AI：[运行: VAULT_PASSPHRASE="mypassword" vault list]
     📋 已保存的密钥：
     - openai_key - OpenAI API Key
     - github_token - GitHub Token
@@ -142,14 +144,29 @@ vault delete <key>
 vault reset
 ```
 
+### 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `VAULT_PASSPHRASE` | Vault 密码（跳过交互式输入） |
+
+```bash
+# 非交互式使用（脚本/AI 调用）
+VAULT_PASSPHRASE="yourpassword" vault set mykey "myvalue"
+VAULT_PASSPHRASE="yourpassword" vault get mykey
+```
+
 ---
 
 ## 安全设计
 
 - **加密算法**: AES-256-GCM
 - **密钥派生**: PBKDF2 (100,000 次迭代)
+- **主密钥**: 从 Vault 密码派生（相同密码 = 相同密钥）
 - **存储位置**: iCloud（macOS）或本地 `~/.vault-data/`
-- **主密钥**: 系统 Keychain（受密码保护）
+- **多设备同步**: 通过 iCloud 自动同步，所有设备使用相同密码即可访问
+
+⚠️ **忘记密码无法恢复** — 密码是唯一能解密数据的途径
 
 ---
 
