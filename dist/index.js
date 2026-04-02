@@ -55,7 +55,7 @@ Commands:
   list                 List all secrets
   delete <key>         Delete a secret
   status               Check Vault status
-  reset                Reset Vault (⚠️ deletes all data)
+  version              Show version information
 
 Options:
   -d, --description    Secret description (for set command)
@@ -66,6 +66,7 @@ Examples:
   vault set openai_key     # Will prompt for value
   vault get openai_key
   vault list
+  vault version
 `);
 }
 /**
@@ -272,26 +273,22 @@ async function handleStatus() {
     showStatusSummary(status);
 }
 /**
- * Handle reset command
+ * Handle version command
  */
-async function handleReset() {
-    const sure = await confirm('This will delete ALL your secrets. This action cannot be undone. Continue?');
-    if (!sure) {
-        info('Cancelled.');
-        return;
+async function handleVersion() {
+    // Read version from package.json
+    const { readFile } = await import('fs/promises');
+    const { join, dirname } = await import('path');
+    const { fileURLToPath } = await import('url');
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packagePath = join(__dirname, '..', 'package.json');
+    try {
+        const pkg = JSON.parse(await readFile(packagePath, 'utf-8'));
+        console.log(`@principle2026/vault v${pkg.version}`);
     }
-    const reallySure = await confirm('Are you REALLY sure? Type "yes" to confirm: ');
-    if (reallySure) {
-        const result = await resetVault();
-        if (result.success) {
-            success('Vault has been reset. Run "vault init" to set up again.');
-        }
-        else {
-            error(result.message);
-        }
-    }
-    else {
-        info('Cancelled.');
+    catch {
+        console.log('@principle2026/vault (version unknown)');
     }
 }
 /**
@@ -398,8 +395,10 @@ async function main() {
             case 'status':
                 await handleStatus();
                 break;
-            case 'reset':
-                await handleReset();
+            case 'version':
+            case '--version':
+            case '-v':
+                await handleVersion();
                 break;
             default:
                 // Maybe they typed "vault openai_key" instead of "vault get openai_key"?
