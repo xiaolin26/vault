@@ -8,7 +8,7 @@
  * - Same passphrase = same master key on all devices
  * - No keychain dependency for the master key
  */
-import { decrypt, deriveKey, encrypt, generateSalt, validatePassphrase, } from './Crypto.js';
+import { decrypt, deriveKey, encrypt, generateSalt, validatePassphrase, VaultError, } from './Crypto.js';
 import { readStore, writeStore, } from './Store.js';
 // ============================================================================
 // Constants
@@ -16,6 +16,9 @@ import { readStore, writeStore, } from './Store.js';
 // Vault salt is stored in the data file and shared across devices
 // This allows same passphrase to derive same master key on all devices
 const VAULT_SALT_KEY = '_vault_salt';
+// Verification token - encrypted known value to verify passphrase correctness
+const VAULT_VERIFY_KEY = '_vault_verify';
+const VERIFICATION_VALUE = 'VALID';
 // ============================================================================
 // Error types
 // ============================================================================
@@ -55,6 +58,30 @@ async function deriveMasterKey(passphrase, salt) {
     return deriveKey(passphrase, saltBuffer);
 }
 /**
+ * Verify passphrase by decrypting the verification token
+ * Throws an error if passphrase is incorrect
+ */
+async function verifyPassphrase(store, passphrase) {
+    const verifyEntry = store.secrets[VAULT_VERIFY_KEY];
+    if (!verifyEntry) {
+        // Old vault format without verification - upgrade needed
+        throw new Error('Vault format outdated. Please run vault init to migrate.');
+    }
+    try {
+        const parsed = JSON.parse(verifyEntry.value);
+        const decrypted = await decrypt(parsed.encrypted, parsed.salt, passphrase);
+        if (decrypted !== VERIFICATION_VALUE) {
+            throw new VaultError('INVALID_PASSPHRASE', 'Incorrect passphrase');
+        }
+    }
+    catch (error) {
+        if (error instanceof VaultError) {
+            throw error;
+        }
+        throw new VaultError('INVALID_PASSPHRASE', 'Incorrect passphrase');
+    }
+}
+/**
  * Initialize Vault
  */
 export async function initVault(userId, passphrase) {
@@ -70,10 +97,12 @@ export async function initVault(userId, passphrase) {
         }
         // Generate vault salt (shared across devices)
         const vaultSalt = generateSalt();
+        // Create verification token (encrypt known value with passphrase)
+        const verifyToken = await encrypt(VERIFICATION_VALUE, passphrase);
         // Get storage location
         const { getStorageLocation } = await import('./Store.js');
         const location = await getStorageLocation();
-        // Initialize storage with vault salt
+        // Initialize storage with vault salt and verification token
         const newData = {
             version: '2.0', // New version with synced master key
             user_id: userId,
@@ -83,6 +112,12 @@ export async function initVault(userId, passphrase) {
                 [VAULT_SALT_KEY]: {
                     value: JSON.stringify({ salt: vaultSalt }),
                     description: 'Vault salt (do not delete)',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                },
+                [VAULT_VERIFY_KEY]: {
+                    value: JSON.stringify(verifyToken),
+                    description: 'Passphrase verification (do not delete)',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                 },
@@ -140,12 +175,9 @@ export async function setSecret(key, value, passphrase, description) {
         if (!store || !store.secrets[VAULT_SALT_KEY]) {
             throw new VaultNotInitializedError();
         }
-        // Get vault salt
-        const vaultSaltData = store.secrets[VAULT_SALT_KEY];
-        const vaultSalt = JSON.parse(vaultSaltData.value).salt;
-        // Derive master key
-        const masterKey = await deriveMasterKey(passphrase, vaultSalt);
-        // Encrypt secret value with the passphrase (encrypt function derives key internally)
+        // Verify passphrase before making any changes
+        await verifyPassphrase(store, passphrase);
+        // Encrypt secret value with the passphrase
         const encrypted = await encrypt(value, passphrase);
         // Update secret
         const now = new Date().toISOString();
@@ -182,13 +214,11 @@ export async function listSecrets(passphrase) {
     if (!store || !store.secrets[VAULT_SALT_KEY]) {
         throw new VaultNotInitializedError();
     }
-    // Verify passphrase by deriving master key
-    const vaultSaltData = store.secrets[VAULT_SALT_KEY];
-    const vaultSalt = JSON.parse(vaultSaltData.value).salt;
-    await deriveMasterKey(passphrase, vaultSalt);
-    // Return list of secret names (without vault salt, without values)
+    // Verify passphrase before allowing access
+    await verifyPassphrase(store, passphrase);
+    // Return list of secret names (without vault salt and verify token, without values)
     return Object.entries(store.secrets)
-        .filter(([key]) => key !== VAULT_SALT_KEY)
+        .filter(([key]) => key !== VAULT_SALT_KEY && key !== VAULT_VERIFY_KEY)
         .map(([key, entry]) => ({
         key,
         description: entry.description || '',
@@ -204,9 +234,8 @@ export async function deleteSecret(key, passphrase) {
         if (!store || !store.secrets[VAULT_SALT_KEY]) {
             throw new VaultNotInitializedError();
         }
-        const vaultSaltData = store.secrets[VAULT_SALT_KEY];
-        const vaultSalt = JSON.parse(vaultSaltData.value).salt;
-        await deriveMasterKey(passphrase, vaultSalt);
+        // Verify passphrase before allowing deletion
+        await verifyPassphrase(store, passphrase);
         // Check if secret exists
         if (!store.secrets[key]) {
             return { success: false, message: `Secret "${key}" not found` };
@@ -234,12 +263,15 @@ export async function getVaultStatus() {
     const { getStorageInfo } = await import('./Store.js');
     const storageInfo = await getStorageInfo();
     const hasVaultSalt = store !== null && VAULT_SALT_KEY in store.secrets;
+    const hasVerifyToken = store !== null && VAULT_VERIFY_KEY in store.secrets;
+    // Count internal fields (salt + verify token)
+    const internalFields = (hasVaultSalt ? 1 : 0) + (hasVerifyToken ? 1 : 0);
     return {
         initialized: store !== null,
         storageType: storageInfo.type,
         userId: store?.user_id,
-        secretCount: store ? Object.keys(store.secrets).length - (hasVaultSalt ? 1 : 0) : 0,
-        isNewVersion: hasVaultSalt,
+        secretCount: store ? Object.keys(store.secrets).length - internalFields : 0,
+        isNewVersion: hasVaultSalt && hasVerifyToken,
     };
 }
 /**
