@@ -247,7 +247,7 @@ async function handleSet(args: string[]) {
 
   // Check if value is piped from stdin
   const stdin = process.stdin
-  const isPiped = !stdin.isTTY
+  const isPiped = stdin.isTTY === false
 
   if (isPiped) {
     // Read from pipe
