@@ -13,6 +13,11 @@ Vault 是一个 AI 驱动的密钥管理工具，为 Claude Code 设计。
 
 ## 重要修复 (2026-04-02)
 
+### Bug 修复：stdin 管道检测错误
+**问题**: CLI 中 `handleSet` 函数使用 `!stdin.isTTY` 检测管道输入，当 `isTTY` 为 `undefined` 时错误判断为有管道输入，导致命令行参数被忽略。
+
+**修复**: 改为 `stdin.isTTY === false` 明确检查。
+
 ### 密码验证漏洞修复
 **问题**: 原代码中 `deriveMasterKey` 只派生密钥，不验证密码正确性，任何密码都能解密数据。
 
